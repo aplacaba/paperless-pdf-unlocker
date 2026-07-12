@@ -16,7 +16,8 @@
         (concatenate 'string b "/" p))))
 
 (defun make-real-http-fn (url token)
-  (lambda (method path &key params content content-type want-bytes timeout multipart)
+  (lambda (method path &key params content content-type want-bytes timeout multipart
+           &allow-other-keys)
     (declare (ignore content-type))
     (let ((headers (list (cons "Authorization"
                                (format nil "Token ~A" token))
@@ -27,9 +28,7 @@
                        :content (or multipart content)
                        :headers headers
                        :force-binary want-bytes
-                       :use-connection-pool nil
-                       :read-timeout timeout
-                       :connect-timeout timeout))))
+                       :use-connection-pool nil))))
 
 (defun make-client (&key url token (http-timeout 30) (http-fn nil http-fn-supplied))
   (make-client-raw :url url
