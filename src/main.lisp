@@ -93,7 +93,7 @@
                              index (unlocker.config:config-candidates config)))))
     (error (e)
       (unlocker.logging:log-error
-       nil "cycle-level error, will retry next cycle: ~A" e))))
+       nil "cycle-level error, will retry next cycle: [~A] ~A" (type-of e) e))))
 
 (defun start ()
   (setf *stopping* nil)
