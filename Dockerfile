@@ -8,9 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -sSLO https://beta.quicklisp.org/quicklisp.lisp && \
     sbcl --non-interactive --load quicklisp.lisp \
          --eval '(quicklisp-quickstart:install)' \
-         --eval '(ql:add-to-init-file)' \
          --eval '(quit)' && \
-    rm quicklisp.lisp
+    rm quicklisp.lisp && \
+    printf '#-quicklisp\n(let ((qi (merge-pathnames "quicklisp/setup.lisp" (user-homedir-pathname))))\n  (when (probe-file qi)\n    (load qi)))\n' > ~/.sbclrc
 
 WORKDIR /app
 COPY unlocker.asd ./
@@ -31,7 +31,7 @@ RUN mkdir -p /root/.cache/common-lisp && \
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    qpdf ca-certificates openssl && \
+    qpdf ca-certificates zlib1g libssl3 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
