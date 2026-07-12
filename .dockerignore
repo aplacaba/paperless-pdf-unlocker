@@ -1,0 +1,9 @@
+.git
+*.pdf
+unlocker-tests
+openspec
+docs
+docker-compose.example.yml
+.dockerignore
+*.fasl
+*.gitignore

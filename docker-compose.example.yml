@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  unlocker:
+    build: .
+    restart: unless-stopped
+    environment:
+      PAPERLESS_URL: https://paperless.example.com
+      PAPERLESS_TOKEN: your-api-token-here
+      PASSWORD_CANDIDATES: candidate1,candidate2
+      LOCKED_TAG: locked
+      UNLOCK_FAILED_TAG: unlock-failed
+      POLL_INTERVAL_SECONDS: "60"
+      HTTP_TIMEOUT_SECONDS: "30"
+      LOG_LEVEL: info
