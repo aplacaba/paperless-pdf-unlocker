@@ -15,7 +15,7 @@
             (p (string-left-trim '(#\/) path)))
         (concatenate 'string b "/" p))))
 
-(defun make-real-http-fn (url token)
+(defun make-real-http-fn (url token skip-ssl)
   (lambda (method path &key params content content-type want-bytes timeout multipart
            &allow-other-keys)
     (declare (ignore content-type timeout))
@@ -24,18 +24,29 @@
            (headers (list (cons "Authorization"
                                 (format nil "Token ~A" token))
                           (cons "Accept" "application/json"))))
-      (dexador:request full-url
-                       :method method
-                       :content (or multipart content)
-                       :headers headers
-                       :force-binary want-bytes
-                       :use-connection-pool nil))))
+      (if skip-ssl
+           (let ((cl+ssl:*make-ssl-client-stream-verify-default* nil))
+            (dexador:request full-url
+                             :method method
+                             :content (or multipart content)
+                             :headers headers
+                             :force-binary want-bytes
+                             :use-connection-pool nil))
+          (dexador:request full-url
+                           :method method
+                           :content (or multipart content)
+                           :headers headers
+                           :force-binary want-bytes
+                           :use-connection-pool nil)))))
 
-(defun make-client (&key url token (http-timeout 30) (http-fn nil http-fn-supplied))
+(defun make-client (&key url token (http-timeout 30) (http-fn nil http-fn-supplied)
+                         (skip-ssl nil))
   (make-client-raw :url url
                    :token token
                    :http-timeout http-timeout
-                   :http-fn (if http-fn-supplied http-fn (make-real-http-fn url token))))
+                   :http-fn (if http-fn-supplied
+                                http-fn
+                                (make-real-http-fn url token skip-ssl))))
 
 (defun jget (plist key)
   (getf plist (intern key :keyword)))

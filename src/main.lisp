@@ -107,7 +107,8 @@
     (let ((client (unlocker.paperless:make-client
                    :url (unlocker.config:config-url config)
                    :token (unlocker.config:config-token config)
-                   :http-timeout (unlocker.config:config-http-timeout config))))
+                   :http-timeout (unlocker.config:config-http-timeout config)
+                   :skip-ssl (not (equal "" (or (uiop:getenv "SKIP_SSL_VERIFY") ""))))))
       (unlocker.logging:log-info nil "starting poll loop (interval ~As)."
                                  (unlocker.config:config-poll-interval config))
       (loop until *stopping*

@@ -5,11 +5,13 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      PAPERLESS_URL: https://paperless.example.com
-      PAPERLESS_TOKEN: your-api-token-here
-      PASSWORD_CANDIDATES: candidate1,candidate2
+      PAPERLESS_URL: https://paperless.local:30080
+      PAPERLESS_TOKEN: 5046078ba9a1060d80999aed0548cfcd5423e193
+      PASSWORD_CANDIDATES: 12Sep1990
       LOCKED_TAG: locked
       UNLOCK_FAILED_TAG: unlock-failed
       POLL_INTERVAL_SECONDS: "60"
       HTTP_TIMEOUT_SECONDS: "30"
       LOG_LEVEL: info
+      # Set to any value to skip SSL cert verification (e.g. for self-signed certs)
+      SKIP_SSL_VERIFY: "1"
