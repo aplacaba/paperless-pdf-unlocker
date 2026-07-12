@@ -2,3 +2,7 @@
 # Sample data (large PDFs used as test fixtures)
 eStatement_*.pdf
 rcbc_unlocked.pdf
+
+openspec/
+docs/
+.opencode/
