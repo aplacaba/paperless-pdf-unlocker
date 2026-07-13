@@ -25,13 +25,17 @@
                                 (format nil "Token ~A" token))
                           (cons "Accept" "application/json"))))
       (if skip-ssl
-           (let ((cl+ssl:*make-ssl-client-stream-verify-default* nil))
-            (dexador:request full-url
-                             :method method
-                             :content (or multipart content)
-                             :headers headers
-                             :force-binary want-bytes
-                             :use-connection-pool nil))
+          (let ((cl+ssl:*make-ssl-client-stream-verify-default* nil))
+            (handler-bind ((cl+ssl:ssl-error-verify
+                             (lambda (c)
+                               (declare (ignore c))
+                               (invoke-restart 'continue))))
+              (dexador:request full-url
+                               :method method
+                               :content (or multipart content)
+                               :headers headers
+                               :force-binary want-bytes
+                               :use-connection-pool nil)))
           (dexador:request full-url
                            :method method
                            :content (or multipart content)
