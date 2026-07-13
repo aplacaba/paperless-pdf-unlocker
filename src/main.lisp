@@ -41,13 +41,19 @@
                 (unlocker.paperless:patch-document-tags client doc-id new-tags))
               (unlocker.logging:log-warn
                doc-id "could not unlock; marked unlock-failed."))
-            (progn
-              (let ((meta (metadata-plist doc locked-tag-id)))
-                (unlocker.paperless:upload-document
-                 client unlocked (unlocker.paperless:document-filename doc) meta))
-              (unlocker.paperless:delete-document client doc-id)
-              (unlocker.logging:log-info
-               doc-id "unlocked, uploaded replacement, deleted original."))))
+             (progn
+               (let* ((meta (metadata-plist doc locked-tag-id))
+                      (resp (unlocker.paperless:upload-document
+                             client unlocked (unlocker.paperless:document-filename doc) meta))
+                      (new-id (unlocker.paperless:wait-for-document-id client resp 30))
+                      (clean-tags (remove locked-tag-id (unlocker.paperless:document-tags doc))))
+                 (when (and new-id clean-tags)
+                   ;; Belt-and-suspenders: ensure the locked tag is not on the replacement
+                   (unlocker.paperless:patch-document-tags client new-id clean-tags))
+                 (unlocker.paperless:delete-document client doc-id)
+                 (unlocker.logging:log-info
+                  doc-id "unlocked, uploaded replacement~A, deleted original."
+                  (if new-id (format nil " (id=~A)" new-id) ""))))
     (error (e)
       (unlocker.logging:log-error
        doc-id "transient error processing document, skipping: ~A" e))))

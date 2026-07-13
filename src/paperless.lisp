@@ -186,7 +186,6 @@
   (or (jget doc "original_filename") "document.pdf"))
 
 (defun build-upload-parts (bytes filename metadata-plist)
-  "Write BYTES to a temp file. Parts use the pathname so dexador detects multipart."
   (let ((tmp-path (make-pathname :name (format nil "unlocker-upload-~A" (get-universal-time))
                                  :type "pdf"
                                  :defaults (uiop:temporary-directory))))
@@ -225,6 +224,25 @@
       (when (probe-file tmp-path)
         (delete-file tmp-path)))))
 
+(defun upload-document (client bytes filename metadata-plist)
+  (let* ((info (build-upload-parts bytes filename metadata-plist))
+         (parts (getf info :parts))
+         (tmp-path (getf info :tmp-path)))
+    (unwind-protect
+         (progn
+           (multiple-value-bind (status body)
+               (funcall (client-http-fn client)
+                        :post "/api/documents/post_document/"
+                        :multipart parts
+                        :want-bytes nil
+                        :timeout (client-http-timeout client))
+             (declare (ignore status))
+             (if (or (null body) (string= body ""))
+                 nil
+                 (jonathan:parse body))))
+      (when (probe-file tmp-path)
+        (delete-file tmp-path)))))
+
 (defun task-result-document-id (task-data)
   (or (jget task-data "result")
       (jget task-data "related_document")
@@ -232,3 +250,17 @@
 
 (defun get-task (client task-id)
   (call-json client :get (format nil "/api/tasks/~A/" task-id)))
+
+(defun wait-for-document-id (client response max-attempts)
+  (loop for i below max-attempts
+        for task-id = (jget response "task_id")
+        when (null task-id) return nil
+        do (let ((task (get-task client task-id)))
+             (when task
+               (let ((status (jget task "status")))
+                 (when (and (stringp status) (string= status "SUCCESS"))
+                   (return-from wait-for-document-id (jget task "result")))
+                 (when (and (stringp status) (string= status "FAILURE"))
+                   (return-from wait-for-document-id nil)))))
+           (sleep 1))
+  nil)
