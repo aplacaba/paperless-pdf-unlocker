@@ -151,10 +151,21 @@
   (let* ((param (cons (format nil "custom_field_~A" field-id)
                       (princ-to-string source-id)))
          (data (call-json client :get "/api/documents/"
-                          :params (list param (cons "page_size" "1"))))
+                          :params (list param (cons "page_size" "100"))))
          (hits (results-of data)))
-    (when hits
-      (jget (first hits) "id"))))
+    (dolist (doc hits)
+      (when (has-custom-field-value doc field-id source-id)
+        (return-from replacement-for (jget doc "id"))))
+    nil))
+
+(defun has-custom-field-value (doc field-id source-id)
+  (let ((cfs (jget doc "custom_fields")))
+    (when cfs
+      (dolist (cf cfs)
+        (when (and (eql (jget cf "field") field-id)
+                   (let ((v (jget cf "value")))
+                     (and (integerp v) (eql v source-id))))
+          (return-from has-custom-field-value t))))))
 
 (defun build-lineage-index (client field-id source-ids)
   (let ((table (make-hash-table :test #'eql)))
@@ -174,46 +185,45 @@
 (defun document-filename (doc)
   (or (jget doc "original_filename") "document.pdf"))
 
-(defun build-upload-parts (bytes filename metadata-plist field-id source-id)
-  (let ((parts nil))
-    (push `("document" ,bytes :filename ,filename :content-type "application/pdf")
-          parts)
-    (push `("title" ,(getf metadata-plist :title)) parts)
-    (let ((created (getf metadata-plist :created)))
-      (when created (push `("created" ,created) parts)))
-    (let ((corr (getf metadata-plist :correspondent)))
-      (when corr (push `("correspondent" ,(princ-to-string corr)) parts)))
-    (let ((dtype (getf metadata-plist :document-type)))
-      (when dtype (push `("document_type" ,(princ-to-string dtype)) parts)))
-    (dolist (tag (getf metadata-plist :tags))
-      (push `("tags" ,(princ-to-string tag)) parts))
-    (when (and field-id source-id)
-      (push `("custom_fields"
-              ,(jonathan:to-json
-                (list (jobj "field" field-id "value" source-id))))
-            parts))
-    (nreverse parts)))
+(defun build-upload-parts (bytes filename metadata-plist)
+  "Write BYTES to a temp file. Parts use the pathname so dexador detects multipart."
+  (let ((tmp-path (make-pathname :name (format nil "unlocker-upload-~A" (get-universal-time))
+                                 :type "pdf"
+                                 :defaults (uiop:temporary-directory))))
+    (with-open-file (s tmp-path :direction :output :if-exists :supersede
+                       :element-type '(unsigned-byte 8))
+      (write-sequence bytes s))
+    (let ((parts nil))
+      (push `("document" . ,tmp-path) parts)
+      (push `("title" . ,(getf metadata-plist :title)) parts)
+      (let ((created (getf metadata-plist :created)))
+        (when created (push `("created" . ,created) parts)))
+      (let ((corr (getf metadata-plist :correspondent)))
+        (when corr (push `("correspondent" . ,(princ-to-string corr)) parts)))
+      (let ((dtype (getf metadata-plist :document-type)))
+        (when dtype (push `("document_type" . ,(princ-to-string dtype)) parts)))
+      (dolist (tag (getf metadata-plist :tags))
+        (push `("tags" . ,(princ-to-string tag)) parts))
+      (list :parts (nreverse parts) :tmp-path tmp-path))))
 
-(defun upload-document (client bytes filename metadata-plist
-                        &key field-id source-id)
-  "Upload via post_document (async consumption). Returns the parsed response.
-
-Open Q1/Q3 (verified against the real instance in task group 8): whether metadata
-+ the custom field are applied during consumption or require a follow-up PATCH,
-and the exact multipart field names. The caller is responsible for confirming the
-new document's id and patching the lineage field if needed."
-  (let ((parts (build-upload-parts bytes filename metadata-plist
-                                   field-id source-id)))
-    (multiple-value-bind (status body)
-        (funcall (client-http-fn client)
-                 :post "/api/documents/post_document/"
-                 :multipart parts
-                 :want-bytes nil
-                 :timeout (client-http-timeout client))
-      (declare (ignore status))
-      (if (or (null body) (string= body ""))
-          nil
-          (jonathan:parse body)))))
+(defun upload-document (client bytes filename metadata-plist)
+  (let* ((info (build-upload-parts bytes filename metadata-plist))
+         (parts (getf info :parts))
+         (tmp-path (getf info :tmp-path)))
+    (unwind-protect
+         (progn
+           (multiple-value-bind (status body)
+               (funcall (client-http-fn client)
+                        :post "/api/documents/post_document/"
+                        :multipart parts
+                        :want-bytes nil
+                        :timeout (client-http-timeout client))
+             (declare (ignore status))
+             (if (or (null body) (string= body ""))
+                 nil
+                 (jonathan:parse body))))
+      (when (probe-file tmp-path)
+        (delete-file tmp-path)))))
 
 (defun task-result-document-id (task-data)
   (or (jget task-data "result")

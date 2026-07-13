@@ -28,49 +28,26 @@
     :created ,(unlocker.paperless:document-created doc)
     :tags ,(remove locked-tag-id (unlocker.paperless:document-tags doc))))
 
-(defun handle-existing-replacement (client doc-id replacement)
-  (unlocker.logging:log-info
-   doc-id "replacement ~A already exists; deleting original only." replacement)
-  (unlocker.paperless:delete-document client doc-id))
-
-(defun handle-unlock-failed (client doc-id locked-tag-id failed-tag-id doc)
-  (let ((new-tags (cons failed-tag-id
-                        (remove locked-tag-id
-                                (unlocker.paperless:document-tags doc)))))
-    (unlocker.paperless:patch-document-tags client doc-id new-tags))
-  (unlocker.logging:log-warn
-   doc-id "could not unlock with any candidate; marked unlock-failed."))
-
-(defun handle-unlock-ok (client doc-id locked-tag-id field-id doc unlocked)
-  (let ((meta (metadata-plist doc locked-tag-id)))
-    (unlocker.paperless:upload-document
-     client unlocked (unlocker.paperless:document-filename doc)
-     meta :field-id field-id :source-id doc-id)
-    (unlocker.paperless:delete-document client doc-id)
-    (unlocker.logging:log-info
-     doc-id "unlocked, uploaded replacement, deleted original.")))
-
-(defun process-locked-document (client doc-id locked-tag-id failed-tag-id
-                                 field-id candidates)
-  (let* ((doc (unlocker.paperless:get-document client doc-id))
-         (bytes (unlocker.paperless:download-document client doc-id))
-         (unlocked (unlocker.qpdf:unlock bytes candidates)))
-    (cond
-      ((null unlocked)
-       (handle-unlock-failed client doc-id locked-tag-id failed-tag-id doc))
-      (t
-       (handle-unlock-ok client doc-id locked-tag-id field-id doc unlocked)))))
-
-(defun handle-document (client doc-id locked-tag-id failed-tag-id
-                        field-id index candidates)
+(defun handle-document (client doc-id locked-tag-id failed-tag-id candidates)
   (handler-case
-      (let ((replacement (gethash doc-id index)))
-        (cond
-          (replacement
-           (handle-existing-replacement client doc-id replacement))
-          (t
-           (process-locked-document client doc-id locked-tag-id failed-tag-id
-                                    field-id candidates))))
+      (let* ((doc (unlocker.paperless:get-document client doc-id))
+             (bytes (unlocker.paperless:download-document client doc-id))
+             (unlocked (unlocker.qpdf:unlock bytes candidates)))
+        (if (null unlocked)
+            (progn
+              (let ((new-tags (cons failed-tag-id
+                                    (remove locked-tag-id
+                                            (unlocker.paperless:document-tags doc)))))
+                (unlocker.paperless:patch-document-tags client doc-id new-tags))
+              (unlocker.logging:log-warn
+               doc-id "could not unlock; marked unlock-failed."))
+            (progn
+              (let ((meta (metadata-plist doc locked-tag-id)))
+                (unlocker.paperless:upload-document
+                 client unlocked (unlocker.paperless:document-filename doc) meta))
+              (unlocker.paperless:delete-document client doc-id)
+              (unlocker.logging:log-info
+               doc-id "unlocked, uploaded replacement, deleted original."))))
     (error (e)
       (unlocker.logging:log-error
        doc-id "transient error processing document, skipping: ~A" e))))
@@ -81,16 +58,12 @@
                              client (unlocker.config:config-locked-tag config)))
              (failed-tag-id (unlocker.paperless:ensure-tag
                              client (unlocker.config:config-unlock-failed-tag config)))
-             (field-id (unlocker.paperless:ensure-custom-field
-                        client "unlock-source-id" "integer"))
-             (doc-ids (unlocker.paperless:list-docs-by-tag client locked-tag-id))
-             (index (unlocker.paperless:build-lineage-index
-                     client field-id doc-ids)))
+             (doc-ids (unlocker.paperless:list-docs-by-tag client locked-tag-id)))
         (unlocker.logging:log-info nil "cycle: ~A locked document(s)." (length doc-ids))
         (dolist (doc-id doc-ids)
           (unless *stopping*
-            (handle-document client doc-id locked-tag-id failed-tag-id field-id
-                             index (unlocker.config:config-candidates config)))))
+            (handle-document client doc-id locked-tag-id failed-tag-id
+                             (unlocker.config:config-candidates config)))))
     (error (e)
       (unlocker.logging:log-error
        nil "cycle-level error, will retry next cycle: [~A] ~A" (type-of e) e))))

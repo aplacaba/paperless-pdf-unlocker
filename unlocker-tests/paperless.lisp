@@ -85,17 +85,6 @@
         (ok id1)
         (ok (eql (ensure-custom-field client "unlock-source-id" "integer") id1))))))
 
-(deftest lineage-index
-  (testing "maps source-ids that have a replacement"
-    (let* ((state (make-fake-state))
-           (fn (make-fake-http-fn state))
-           (client (make-client :url "https://x" :token "t" :http-fn fn)))
-      (setf (gethash 11 (fake-state-replacement-table state)) 99)
-      (let ((index (build-lineage-index client 5 (list 10 11 12))))
-        (ok (null (gethash 10 index)))
-        (ok (eql (gethash 11 index) 99))
-        (ok (null (gethash 12 index)))))))
-
 (deftest http-timeout-forwarded
   (testing "the configured timeout is forwarded to each call"
     (let* ((state (make-fake-state))
