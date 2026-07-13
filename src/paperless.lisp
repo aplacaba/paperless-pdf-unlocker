@@ -23,7 +23,8 @@
                                                 (or (params-to-query params) ""))))
            (headers (list (cons "Authorization"
                                 (format nil "Token ~A" token))
-                          (cons "Accept" "application/json"))))
+                          (cons "Accept" "application/json")
+                          (cons "User-Agent" "paperless-pdf-unlocker"))))
       (multiple-value-bind (body status)
           (dexador:request full-url
                            :method method
