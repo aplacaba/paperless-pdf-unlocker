@@ -95,6 +95,69 @@
       (unlocker.logging:log-error
        nil "cycle-level error, will retry next cycle: [~A] ~A" (type-of e) e))))
 
+(defun hex-dump (bytes max-len)
+  (let* ((len (min (length bytes) max-len))
+         (s (make-string-output-stream)))
+    (loop for i below len
+          for b = (aref bytes i)
+          when (zerop (mod i 16)) do (format s "~%  ~4,'0X  " i)
+          do (format s "~2,'0X " b)
+          when (and (> len 16) (= (mod (1+ i) 8) 0)) do (format s " "))
+    (get-output-stream-string s)))
+
+(defun diagnose-connection (url skip-ssl)
+  (handler-case
+      (let* ((https-p (or (and (>= (length url) 8)
+                               (string= url "https://" :end1 8))
+                          (and (>= (length url) 7)
+                               (string= url "http://" :end1 7))))
+             (after-scheme (cond
+                             ((and (>= (length url) 8)
+                                   (string= url "https://" :end1 8))
+                              (subseq url 8))
+                             ((and (>= (length url) 7)
+                                   (string= url "http://" :end1 7))
+                              (subseq url 7))
+                             (t url)))
+             (slash (position #\/ after-scheme))
+             (host (string-right-trim '(#\:)
+                                     (if slash
+                                         (subseq after-scheme 0 slash)
+                                         after-scheme)))
+             (port (let ((colon (position #\: host)))
+                     (if colon
+                         (parse-integer (subseq host (1+ colon)))
+                         (if https-p 443 80))))
+             (hostname (let ((colon (position #\: host)))
+                         (if colon (subseq host 0 colon) host)))
+             (path (if slash (subseq after-scheme slash) "/"))
+             (socket (usocket:socket-connect hostname port
+                                              :element-type '(unsigned-byte 8)))
+             (stream (if https-p
+                         (cl+ssl:make-ssl-client-stream
+                          (usocket:socket-stream socket)
+                          :verify (not skip-ssl)
+                          :hostname hostname)
+                         (usocket:socket-stream socket)))
+             (req (format nil "GET /api/ HTTP/1.1~C~CHost: ~A~C~CAccept: */*~C~C~C~C"
+                          #\Return #\Newline hostname #\Return #\Newline
+                          #\Return #\Newline #\Return #\Newline)))
+        (unlocker.logging:log-info nil "diagnostic: connecting to ~A:~A~A" hostname port path)
+        (write-sequence (map 'vector #'char-code req) stream)
+        (force-output stream)
+        (let ((buf (make-array 512 :element-type '(unsigned-byte 8))))
+          (let ((n (handler-case (read-sequence buf stream)
+                     (end-of-file () 0)
+                     (t () 0))))
+            (unlocker.logging:log-info nil "diagnostic: read ~A bytes from server" n)
+            (unlocker.logging:log-info nil "diagnostic raw bytes: ~A" (hex-dump buf n))
+            (unlocker.logging:log-info nil "diagnostic ascii: ~A"
+                                       (map 'string #'code-char (subseq buf 0 n)))))
+        (usocket:socket-close socket)
+        (unlocker.logging:log-info nil "diagnostic: complete."))
+    (error (e)
+      (unlocker.logging:log-error nil "diagnostic failed: ~A" e))))
+
 (defun start ()
   (setf *stopping* nil)
   (install-signal-handlers)
@@ -111,6 +174,8 @@
                    :skip-ssl (not (equal "" (or (uiop:getenv "SKIP_SSL_VERIFY") ""))))))
       (unlocker.logging:log-info nil "starting poll loop (interval ~As)."
                                  (unlocker.config:config-poll-interval config))
+      (diagnose-connection (unlocker.config:config-url config)
+                           (not (equal "" (or (uiop:getenv "SKIP_SSL_VERIFY") ""))))
       (loop until *stopping*
             do (run-cycle client config)
                (unless *stopping*
