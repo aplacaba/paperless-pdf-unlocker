@@ -34,10 +34,21 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login Helm to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Package and push Helm chart
+        run: |
+          helm package chart/
+          helm push paperless-pdf-unlocker-*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}/charts

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "paperless-pdf-unlocker.fullname" . }}
+  labels:
+    app.kubernetes.io/name: paperless-pdf-unlocker
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: paperless-pdf-unlocker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: paperless-pdf-unlocker
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: unlocker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PAPERLESS_URL
+              value: {{ .Values.config.paperlessUrl | quote }}
+            - name: PAPERLESS_TOKEN
+              value: {{ .Values.config.paperlessToken | quote }}
+            - name: PASSWORD_CANDIDATES
+              value: {{ .Values.config.passwordCandidates | quote }}
+            - name: LOCKED_TAG
+              value: {{ .Values.config.lockedTag | quote }}
+            - name: UNLOCK_FAILED_TAG
+              value: {{ .Values.config.unlockFailedTag | quote }}
+            - name: POLL_INTERVAL_SECONDS
+              value: {{ .Values.config.pollIntervalSeconds | quote }}
+            - name: HTTP_TIMEOUT_SECONDS
+              value: {{ .Values.config.httpTimeoutSeconds | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: SKIP_SSL_VERIFY
+              value: {{ .Values.config.skipSslVerify | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

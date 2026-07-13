@@ -1,0 +1,5 @@
+# Pattern syntax: https://helm.sh/docs/topics/charts/#helmignore
+
+.git/
+.helmignore
+*.tgz

@@ -7,3 +7,4 @@ openspec/
 docs/
 .opencode/
 docker-compose.yml
+*.tgz
