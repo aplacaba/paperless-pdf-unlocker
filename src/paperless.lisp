@@ -30,7 +30,7 @@
                        :headers headers
                        :force-binary want-bytes
                        :use-connection-pool nil
-                       :verify (unless skip-ssl :required)))))
+                       :insecure skip-ssl))))
 
 (defun make-client (&key url token (http-timeout 30) (http-fn nil http-fn-supplied)
                          (skip-ssl nil))
