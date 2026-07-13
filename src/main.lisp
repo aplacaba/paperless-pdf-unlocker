@@ -53,7 +53,7 @@
                  (unlocker.paperless:delete-document client doc-id)
                  (unlocker.logging:log-info
                   doc-id "unlocked, uploaded replacement~A, deleted original."
-                  (if new-id (format nil " (id=~A)" new-id) ""))))
+                   (if new-id (format nil " (id=~A)" new-id) ""))))))
     (error (e)
       (unlocker.logging:log-error
        doc-id "transient error processing document, skipping: ~A" e))))
@@ -118,9 +118,10 @@
                           :verify (not skip-ssl)
                           :hostname hostname)
                          (usocket:socket-stream socket)))
-             (req (format nil "GET /api/ HTTP/1.1~C~CHost: ~A~C~CAccept: */*~C~C~C~C"
-                          #\Return #\Newline hostname #\Return #\Newline
-                          #\Return #\Newline #\Return #\Newline)))
+        (req (format nil "GET /api/ HTTP/1.1~C~CHost: ~A~C~CAccept: */*~C~CConnection: close~C~C~C~C"
+                           #\Return #\Newline hostname #\Return #\Newline
+                           #\Return #\Newline #\Return #\Newline
+                           #\Return #\Newline)))
         (unlocker.logging:log-info nil "diagnostic: connecting to ~A:~A~A" hostname port path)
         (write-sequence (map 'vector #'char-code req) stream)
         (force-output stream)

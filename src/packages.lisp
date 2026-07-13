@@ -59,9 +59,10 @@
            #:document-type
            #:document-created
            #:document-tags
-           #:document-filename
-           #:get-task
-           #:task-result-document-id))
+   #:document-filename
+   #:get-task
+   #:task-result-document-id
+   #:wait-for-document-id))
 
 (defpackage :unlocker.main
   (:use :cl)
