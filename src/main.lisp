@@ -47,8 +47,7 @@
                              client unlocked (unlocker.paperless:document-filename doc) meta))
                       (new-id (unlocker.paperless:wait-for-document-id client resp 30))
                       (clean-tags (remove locked-tag-id (unlocker.paperless:document-tags doc))))
-                 (when (and new-id clean-tags)
-                   ;; Belt-and-suspenders: ensure the locked tag is not on the replacement
+                 (when new-id
                    (unlocker.paperless:patch-document-tags client new-id clean-tags))
                  (unlocker.paperless:delete-document client doc-id)
                  (unlocker.logging:log-info
