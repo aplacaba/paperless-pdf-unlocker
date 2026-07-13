@@ -2,5 +2,5 @@ apiVersion: v2
 name: paperless-pdf-unlocker
 description: Poll Paperless-ngx for encrypted PDFs, decrypt with qpdf, replace.
 type: application
-version: 0.1.0
-appVersion: latest
+version: 0.1.1
+appVersion: 0.1.1
