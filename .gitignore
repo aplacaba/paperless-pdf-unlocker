@@ -6,3 +6,4 @@ rcbc_unlocked.pdf
 openspec/
 docs/
 .opencode/
+docker-compose.yml
