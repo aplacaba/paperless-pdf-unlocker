@@ -64,8 +64,9 @@
 
 (defun params-to-query (params)
   (when params
-    (format nil "?~:{~A=~A~^&~}"
-            (loop for (k . v) in params collect (list k v)))))
+    (format nil "?~{~A=~A~^&~}"
+            (loop for (k . v) in params
+                  append (list k v)))))
 
 (defun call-json (client method path &key params content &allow-other-keys)
   (multiple-value-bind (status body)
@@ -88,8 +89,8 @@
 
 (defun resolve-tag-by-name (client name)
   (let* ((data (call-json client :get "/api/tags/"
-                          :params `(("name__exact" . ,name)
-                                    ("page_size" . "1"))))
+                           :params `(("name__iexact" . ,name)
+                                     ("page_size" . "1"))))
          (hits (results-of data)))
     (when hits
       (jget (first hits) "id"))))
@@ -102,7 +103,7 @@
 
 (defun list-docs-by-tag (client tag-id)
   (let ((all nil)
-        (next (format nil "/api/documents/?tags__id__=~A&page_size=100" tag-id)))
+        (next (format nil "/api/documents/?tags__id=~A&page_size=100" tag-id)))
     (loop while next
           do (let ((data (call-json client :get next)))
                (setf all (append all (mapcar (lambda (d) (jget d "id"))
@@ -224,25 +225,6 @@
       (when (probe-file tmp-path)
         (delete-file tmp-path)))))
 
-(defun upload-document (client bytes filename metadata-plist)
-  (let* ((info (build-upload-parts bytes filename metadata-plist))
-         (parts (getf info :parts))
-         (tmp-path (getf info :tmp-path)))
-    (unwind-protect
-         (progn
-           (multiple-value-bind (status body)
-               (funcall (client-http-fn client)
-                        :post "/api/documents/post_document/"
-                        :multipart parts
-                        :want-bytes nil
-                        :timeout (client-http-timeout client))
-             (declare (ignore status))
-             (if (or (null body) (string= body ""))
-                 nil
-                 (jonathan:parse body))))
-      (when (probe-file tmp-path)
-        (delete-file tmp-path)))))
-
 (defun task-result-document-id (task-data)
   (or (jget task-data "result")
       (jget task-data "related_document")
@@ -251,16 +233,22 @@
 (defun get-task (client task-id)
   (call-json client :get (format nil "/api/tasks/~A/" task-id)))
 
-(defun wait-for-document-id (client response max-attempts)
+(defun wait-for-document-id (client task-uuid max-attempts)
+  (when (null task-uuid) (return-from wait-for-document-id nil))
   (loop for i below max-attempts
-        for task-id = (jget response "task_id")
-        when (null task-id) return nil
-        do (let ((task (get-task client task-id)))
-             (when task
-               (let ((status (jget task "status")))
-                 (when (and (stringp status) (string= status "SUCCESS"))
-                   (return-from wait-for-document-id (jget task "result")))
-                 (when (and (stringp status) (string= status "FAILURE"))
-                   (return-from wait-for-document-id nil)))))
-           (sleep 1))
+        do (let ((results (call-json client :get "/api/tasks/"
+                                     :params `(("task_id" . ,task-uuid)))))
+             (when (consp results)
+               (let ((task (first results)))
+                 (when task
+                   (let ((status (jget task "status")))
+                     (when (and (stringp status) (string= status "SUCCESS"))
+                       (return-from wait-for-document-id
+                         (let ((doc (jget task "related_document")))
+                           (when doc
+                             (if (integerp doc) doc
+                                 (parse-integer doc :junk-allowed t))))))
+                     (when (and (stringp status) (string= status "FAILURE"))
+                       (return-from wait-for-document-id nil))))))
+             (sleep 1)))
   nil)
