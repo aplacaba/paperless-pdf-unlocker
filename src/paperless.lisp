@@ -18,13 +18,15 @@
 (defun make-real-http-fn (url token skip-ssl)
   (lambda (method path &key params content content-type want-bytes timeout multipart
            &allow-other-keys)
-    (declare (ignore content-type timeout))
+    (declare (ignore timeout))
     (let* ((full-url (join-url url (concatenate 'string path
                                                 (or (params-to-query params) ""))))
-           (headers (list (cons "Authorization"
-                                (format nil "Token ~A" token))
-                          (cons "Accept" "application/json")
-                          (cons "User-Agent" "paperless-pdf-unlocker"))))
+           (headers (append (list (cons "Authorization"
+                                        (format nil "Token ~A" token))
+                                  (cons "Accept" "application/json")
+                                  (cons "User-Agent" "paperless-pdf-unlocker"))
+                            (when content-type
+                              (list (cons "Content-Type" content-type))))))
       (multiple-value-bind (body status)
           (dexador:request full-url
                            :method method
@@ -62,7 +64,7 @@
 
 (defun params-to-query (params)
   (when params
-    (format nil "?~{~A=~A~^&~}"
+    (format nil "?~:{~A=~A~^&~}"
             (loop for (k . v) in params collect (list k v)))))
 
 (defun call-json (client method path &key params content &allow-other-keys)
