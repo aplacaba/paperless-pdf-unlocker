@@ -24,13 +24,14 @@
            (headers (list (cons "Authorization"
                                 (format nil "Token ~A" token))
                           (cons "Accept" "application/json"))))
-      (dexador:request full-url
-                       :method method
-                       :content (or multipart content)
-                       :headers headers
-                       :force-binary want-bytes
-                       :use-connection-pool nil
-                       :insecure skip-ssl))))
+      (multiple-value-bind (body status)
+          (drakma:http-request full-url
+                               :method method
+                               :content (or multipart content)
+                               :headers headers
+                               :force-binary want-bytes
+                               :verify (not skip-ssl))
+        (values status body)))))
 
 (defun make-client (&key url token (http-timeout 30) (http-fn nil http-fn-supplied)
                          (skip-ssl nil))

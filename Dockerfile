@@ -20,7 +20,7 @@ COPY src/ src/
 RUN mkdir -p /root/.cache/common-lisp && \
     sbcl --non-interactive \
          --eval '(push "/app/" asdf:*central-registry*)' \
-         --eval '(ql:quickload :dexador :silent t)' \
+         --eval '(ql:quickload :drakma :silent t)' \
          --eval '(ql:quickload :jonathan :silent t)' \
          --eval '(ql:quickload :unlocker :silent t)' \
          --eval '(sb-ext:save-lisp-and-die "unlocker" :executable t :toplevel (quote unlocker.main:start) :compression t)' \

@@ -25,4 +25,4 @@ All via environment variables. See `docker-compose.example.yml`.
 sbcl --eval '(push (truename ".") asdf:*central-registry*)' --eval '(asdf:test-system :unlocker)'
 ```
 
-Requires SBCL, Quicklisp (dexador, jonathan, rove), and `qpdf`.
+Requires SBCL, Quicklisp (drakma, jonathan, rove), and `qpdf`.
