@@ -1,5 +1,5 @@
 (asdf:defsystem "unlocker"
-  :version "0.1.0"
+  :version "0.1.1"
   :description "Poll Paperless-ngx for encrypted PDFs, decrypt with qpdf, replace."
   :license "MIT"
   :depends-on ("dexador"
