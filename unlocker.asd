@@ -2,7 +2,7 @@
   :version "0.1.0"
   :description "Poll Paperless-ngx for encrypted PDFs, decrypt with qpdf, replace."
   :license "MIT"
-  :depends-on ("drakma"
+  :depends-on ("dexador"
                "jonathan"
                "uiop")
   :serial t
